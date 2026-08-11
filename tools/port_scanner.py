@@ -2,14 +2,66 @@ import argparse
 import socket
 
 
+COMMON_SERVICES = {
+    21: "FTP",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    53: "DNS",
+    80: "HTTP",
+    110: "POP3",
+    143: "IMAP",
+    443: "HTTPS",
+    445: "SMB",
+    3306: "MySQL",
+    3389: "RDP",
+    5432: "PostgreSQL",
+    6379: "Redis",
+    8080: "HTTP-Proxy",
+}
+
+
+def get_service_name(port):
+    return COMMON_SERVICES.get(port, "Unknown")
+
+
 def scan_port(target, port, timeout):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(timeout)
 
-    result = sock.connect_ex((target, port))
-    sock.close()
+    try:
+        result = sock.connect_ex((target, port))
 
-    return result == 0
+        if result == 0:
+            return True
+
+        return False
+
+    except socket.error:
+        return False
+
+    finally:
+        sock.close()
+
+
+def get_banner(target, port, timeout):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+
+    try:
+        sock.connect((target, port))
+
+        banner = sock.recv(1024).decode(
+            errors="ignore"
+        ).strip()
+
+        return banner
+
+    except (socket.timeout, socket.error):
+        return ""
+
+    finally:
+        sock.close()
 
 
 def main():
@@ -46,10 +98,10 @@ def main():
 
     args = parser.parse_args()
 
-    print("=" * 50)
-    print("           PYTHON SECURITY TOOLS")
-    print("                PORT SCANNER")
-    print("=" * 50)
+    print("=" * 70)
+    print("                    PYTHON SECURITY TOOLS")
+    print("                         PORT SCANNER")
+    print("=" * 70)
 
     print(f"\nTarget: {args.target}")
     print(f"Ports: {args.start_port}-{args.end_port}\n")
@@ -60,13 +112,37 @@ def main():
         print("[!] Could not resolve target.")
         return
 
-    for port in range(args.start_port, args.end_port + 1):
-        if scan_port(target_ip, port, args.timeout):
-            print(f"[+] Port {port} OPEN")
+    print(f"Resolved IP: {target_ip}\n")
 
-    print("\n" + "=" * 50)
+    print(
+        f"{'PORT':<10}"
+        f"{'STATE':<10}"
+        f"{'SERVICE':<20}"
+        f"BANNER"
+    )
+
+    print("-" * 70)
+
+    for port in range(args.start_port, args.end_port + 1):
+
+        if scan_port(target_ip, port, args.timeout):
+
+            service = get_service_name(port)
+            banner = get_banner(target_ip, port, args.timeout)
+
+            if not banner:
+                banner = "-"
+
+            print(
+                f"{port:<10}"
+                f"{'OPEN':<10}"
+                f"{service:<20}"
+                f"{banner[:35]}"
+            )
+
+    print("\n" + "=" * 70)
     print("Scan completed.")
-    print("=" * 50)
+    print("=" * 70)
 
 
 if __name__ == "__main__":
