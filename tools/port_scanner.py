@@ -1,5 +1,7 @@
 import argparse
 import socket
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 COMMON_SERVICES = {
@@ -33,12 +35,12 @@ def scan_port(target, port, timeout):
         result = sock.connect_ex((target, port))
 
         if result == 0:
-            return True
+            return port, True
 
-        return False
+        return port, False
 
     except socket.error:
-        return False
+        return port, False
 
     finally:
         sock.close()
@@ -66,7 +68,7 @@ def get_banner(target, port, timeout):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Simple TCP port scanner for cybersecurity learning"
+        description="Fast TCP port scanner for cybersecurity learning"
     )
 
     parser.add_argument(
@@ -96,7 +98,26 @@ def main():
         help="Connection timeout in seconds (default: 0.5)"
     )
 
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=100,
+        help="Number of concurrent workers (default: 100)"
+    )
+
     args = parser.parse_args()
+
+    if args.start_port < 1 or args.end_port > 65535:
+        print("[!] Ports must be between 1 and 65535.")
+        return
+
+    if args.start_port > args.end_port:
+        print("[!] Start port cannot be greater than end port.")
+        return
+
+    if args.workers < 1:
+        print("[!] Workers must be greater than 0.")
+        return
 
     print("=" * 70)
     print("                    PYTHON SECURITY TOOLS")
@@ -104,7 +125,8 @@ def main():
     print("=" * 70)
 
     print(f"\nTarget: {args.target}")
-    print(f"Ports: {args.start_port}-{args.end_port}\n")
+    print(f"Ports: {args.start_port}-{args.end_port}")
+    print(f"Workers: {args.workers}\n")
 
     try:
         target_ip = socket.gethostbyname(args.target)
@@ -114,34 +136,75 @@ def main():
 
     print(f"Resolved IP: {target_ip}\n")
 
-    print(
-        f"{'PORT':<10}"
-        f"{'STATE':<10}"
-        f"{'SERVICE':<20}"
-        f"BANNER"
-    )
+    ports = range(args.start_port, args.end_port + 1)
+    total_ports = args.end_port - args.start_port + 1
 
-    print("-" * 70)
+    open_ports = []
 
-    for port in range(args.start_port, args.end_port + 1):
+    start_time = time.perf_counter()
 
-        if scan_port(target_ip, port, args.timeout):
+    print("Starting scan...\n")
 
-            service = get_service_name(port)
-            banner = get_banner(target_ip, port, args.timeout)
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
 
-            if not banner:
-                banner = "-"
-
-            print(
-                f"{port:<10}"
-                f"{'OPEN':<10}"
-                f"{service:<20}"
-                f"{banner[:35]}"
+        futures = [
+            executor.submit(
+                scan_port,
+                target_ip,
+                port,
+                args.timeout
             )
+            for port in ports
+        ]
 
-    print("\n" + "=" * 70)
+        completed = 0
+
+        for future in as_completed(futures):
+
+            port, is_open = future.result()
+
+            completed += 1
+
+            if is_open:
+                open_ports.append(port)
+
+                service = get_service_name(port)
+                banner = get_banner(
+                    target_ip,
+                    port,
+                    args.timeout
+                )
+
+                if not banner:
+                    banner = "-"
+
+                print(
+                    f"[+] {port:<8}"
+                    f"OPEN     "
+                    f"{service:<15}"
+                    f"{banner[:35]}"
+                )
+
+            if completed % 10 == 0 or completed == total_ports:
+                print(
+                    f"\rProgress: "
+                    f"{completed}/{total_ports} ports scanned",
+                    end=""
+                )
+
+    end_time = time.perf_counter()
+
+    scan_time = end_time - start_time
+
+    print("\n")
+
+    closed_ports = total_ports - len(open_ports)
+
+    print("=" * 70)
     print("Scan completed.")
+    print(f"Open ports: {len(open_ports)}")
+    print(f"Closed ports: {closed_ports}")
+    print(f"Scan time: {scan_time:.2f} seconds")
     print("=" * 70)
 
 
