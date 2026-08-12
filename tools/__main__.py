@@ -10,15 +10,16 @@ from tools.file_integrity_monitor import (
 )
 
 from tools.port_scanner import (
-    scan_port,
+    run_scan,
     get_service_name,
     get_banner,
 )
 
+
+
 def scan_command(args):
     import socket
     import time
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     try:
         target_ip = socket.gethostbyname(args.target)
@@ -48,72 +49,51 @@ def scan_command(args):
     print(f"Ports: {args.start_port}-{args.end_port}")
     print(f"Workers: {args.workers}\n")
 
-    ports = range(
-        args.start_port,
-        args.end_port + 1
-    )
+    start_time = time.perf_counter()
+
+    print("Starting scan...\n")
+
+    try:
+        open_ports = run_scan(
+            args.target,
+            args.start_port,
+            args.end_port,
+            args.timeout,
+            args.workers,
+        )
+
+    except ValueError as error:
+        print(f"[!] {error}")
+        return 1
+
+    scan_time = time.perf_counter() - start_time
+
+    for port in open_ports:
+        service = get_service_name(port)
+
+        banner = get_banner(
+            target_ip,
+            port,
+            args.timeout
+        )
+
+        if not banner:
+            banner = "-"
+
+        print(
+            f"[+] {port:<8}"
+            f"OPEN     "
+            f"{service:<15}"
+            f"{banner[:35]}"
+        )
 
     total_ports = (
         args.end_port - args.start_port + 1
     )
 
-    open_ports = []
-
-    start_time = time.perf_counter()
-
-    print("Starting scan...\n")
-
-    with ThreadPoolExecutor(
-        max_workers=args.workers
-    ) as executor:
-
-        futures = [
-            executor.submit(
-                scan_port,
-                target_ip,
-                port,
-                args.timeout
-            )
-            for port in ports
-        ]
-
-        completed = 0
-
-        for future in as_completed(futures):
-
-            port, is_open = future.result()
-
-            completed += 1
-
-            if is_open:
-                open_ports.append(port)
-
-                service = get_service_name(port)
-
-                banner = get_banner(
-                    target_ip,
-                    port,
-                    args.timeout
-                )
-
-                if not banner:
-                    banner = "-"
-
-                print(
-                    f"[+] {port:<8}"
-                    f"OPEN     "
-                    f"{service:<15}"
-                    f"{banner[:35]}"
-                )
-
-    scan_time = time.perf_counter() - start_time
+    closed_ports = total_ports - len(open_ports)
 
     print("\n")
-
-    closed_ports = (
-        total_ports - len(open_ports)
-    )
-
     print("=" * 70)
     print("Scan completed.")
     print(f"Open ports: {len(open_ports)}")

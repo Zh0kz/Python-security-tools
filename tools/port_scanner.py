@@ -64,7 +64,65 @@ def get_banner(target, port, timeout):
 
     finally:
         sock.close()
+def run_scan(target, start_port, end_port, timeout=0.5, workers=100):
+    """
+    Run a concurrent TCP port scan.
 
+    Returns:
+        list[int]: Sorted list of open ports.
+    """
+    if start_port < 1 or end_port > 65535:
+        raise ValueError(
+            "Ports must be between 1 and 65535."
+        )
+
+    if start_port > end_port:
+        raise ValueError(
+            "Start port cannot be greater than end port."
+        )
+
+    if workers < 1:
+        raise ValueError(
+            "Workers must be greater than 0."
+        )
+
+    try:
+        target_ip = socket.gethostbyname(target)
+    except socket.gaierror as error:
+        raise ValueError(
+            f"Could not resolve target: {target}"
+        ) from error
+
+    ports = range(
+        start_port,
+        end_port + 1
+    )
+
+    open_ports = []
+
+    with ThreadPoolExecutor(
+        max_workers=workers
+    ) as executor:
+
+        futures = {
+            executor.submit(
+                scan_port,
+                target_ip,
+                port,
+                timeout
+            ): port
+            for port in ports
+        }
+
+        for future in as_completed(futures):
+            port = futures[future]
+
+            _, is_open = future.result()
+
+            if is_open:
+                open_ports.append(port)
+
+    return sorted(open_ports)
 
 def main():
     parser = argparse.ArgumentParser(
