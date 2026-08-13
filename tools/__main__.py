@@ -17,6 +17,8 @@ from tools.port_scanner import (
 
 from tools.reporting import save_scan_report
 
+from tools.subnet_scanner import scan_subnet
+
 def scan_command(args):
     import socket
     import time
@@ -126,6 +128,77 @@ def scan_command(args):
     print("=" * 70)
 
     return 0
+
+def subnet_command(args):
+        import ipaddress
+        import time
+
+        try:
+            network = ipaddress.ip_network(
+                args.network,
+                strict=False,
+            )
+        except ValueError:
+            print(
+                f"[!] Invalid network: {args.network}"
+            )
+            return 1
+
+        if args.workers < 1:
+            print(
+                f"[!] Invalid number of workers: {args.workers}"
+            )
+            return 1
+
+        hosts = list(network.hosts())
+
+        print("=" * 70)
+        print("                    PYTHON SECURITY TOOLS")
+        print("                         SUBNET SCANNER")
+        print("=" * 70)
+
+        print(f"\nNetwork: {network}")
+        print(f"Hosts: {len(hosts)}")
+        print(f"Workers: {args.workers}\n")
+
+        start_time = time.perf_counter()
+
+        print("Starting subnet scan...\n")
+
+        try:
+            online_hosts = scan_subnet(
+                str(network),
+                args.timeout,
+                args.workers,
+            )
+        
+
+        except ValueError as error:
+            print(f"[!] {error}")
+            return 1
+
+        for host in online_hosts:
+            print(
+                f"[+] {host:<18} ONLINE"
+            )
+
+        scan_time = (
+            time.perf_counter() - start_time
+        )
+
+        offline_hosts = (
+            len(hosts) - len(online_hosts)
+        )
+
+        print("\n")
+        print("=" * 70)
+        print("Subnet scan completed.")
+        print(f"Online hosts: {len(online_hosts)}")
+        print(f"Offline hosts: {offline_hosts}")
+        print(f"Scan time: {scan_time:.2f} seconds")
+        print("=" * 70)
+
+        return 0 
 
 def hash_command(args):
     file_hash = calculate_hash(
@@ -250,6 +323,39 @@ def build_parser():
 
     scan_parser.set_defaults(
         func=scan_command
+    )
+
+    # ==========================
+    # SUBNET SCANNER
+    # ==========================
+
+    subnet_parser = subparsers.add_parser(
+        "subnet",
+        help="Scan a subnet for online hosts"
+    )
+
+    subnet_parser.add_argument(
+        "--network",
+        required=True,
+        help="Network in CIDR notation"
+    )
+
+    subnet_parser.add_argument(
+        "--timeout",
+        type=float,
+        default=1,
+        help="Ping timeout in seconds"
+    )
+
+    subnet_parser.add_argument(
+        "--workers",
+        type=int,
+        default=100,
+        help="Number of concurrent workers"
+    )
+
+    subnet_parser.set_defaults(
+        func=subnet_command
     )
     
     # ==========================
