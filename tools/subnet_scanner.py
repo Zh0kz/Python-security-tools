@@ -1,23 +1,21 @@
 import ipaddress
 import platform
-import subprocess
+import subprocess  # nosec B404
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MAX_HOSTS = 4096
 
 
 
-def ping_host(host, timeout=1):
-    system = platform.system().lower()
-
-    if system == "windows":
+def ping_host(host):
+    if platform.system().lower() == "windows":
         command = [
             "ping",
             "-n",
             "1",
             "-w",
-            str(int(timeout * 1000)),
-            str(host),
+            "1000",
+            host,
         ]
     else:
         command = [
@@ -25,16 +23,17 @@ def ping_host(host, timeout=1):
             "-c",
             "1",
             "-W",
-            str(int(timeout)),
-            str(host),
+            "1",
+            host,
         ]
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603
             command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
+            shell=False,
         )
 
         return host, result.returncode == 0
