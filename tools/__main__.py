@@ -15,7 +15,7 @@ from tools.port_scanner import (
     get_banner,
 )
 
-
+from tools.reporting import save_scan_report
 
 def scan_command(args):
     import socket
@@ -68,6 +68,8 @@ def scan_command(args):
 
     scan_time = time.perf_counter() - start_time
 
+    report_ports = []
+
     for port in open_ports:
         service = get_service_name(port)
 
@@ -80,11 +82,33 @@ def scan_command(args):
         if not banner:
             banner = "-"
 
+        report_ports.append(
+            {
+                "port": port,
+                "service": service,
+                "banner": banner,
+            }
+        )
+
         print(
             f"[+] {port:<8}"
             f"OPEN     "
             f"{service:<15}"
             f"{banner[:35]}"
+        )
+
+    if args.output:
+        save_scan_report(
+            args.output,
+            args.target,
+            args.start_port,
+            args.end_port,
+            report_ports,
+            scan_time,
+        )
+
+        print(
+            f"\nReport saved: {args.output}"
         )
 
     total_ports = (
@@ -217,6 +241,11 @@ def build_parser():
         type=int,
         default=100,
         help="Number of concurrent workers"
+    )
+
+    scan_parser.add_argument(
+    "--output",
+    help="Save scan report to JSON file"
     )
 
     scan_parser.set_defaults(
