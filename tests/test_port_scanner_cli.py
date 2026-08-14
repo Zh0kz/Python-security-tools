@@ -56,3 +56,11 @@ def test_scan_custom_values():
     assert args.end_port == 100
     assert args.timeout == 1.0
     assert args.workers == 25
+
+from tools.service_detection import detect_service
+
+
+def test_banner_service_detection():
+    banner = "SSH-2.0-OpenSSH_9.6"
+
+    assert detect_service(banner) == "SSH"

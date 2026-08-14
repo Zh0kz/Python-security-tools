@@ -2,6 +2,8 @@ import argparse
 
 from tools.hash_checker import calculate_hash
 
+from tools.service_detection import detect_service
+
 from tools.file_integrity_monitor import (
     create_baseline,
     save_baseline,
@@ -81,6 +83,11 @@ def scan_command(args):
             args.timeout
         )
 
+        detected_service = detect_service(banner)
+
+        if detected_service != "Unknown":
+            service = detected_service
+
         if not banner:
             banner = "-"
 
@@ -92,12 +99,12 @@ def scan_command(args):
             }
         )
 
-        print(
-            f"[+] {port:<8}"
-            f"OPEN     "
-            f"{service:<15}"
-            f"{banner[:35]}"
-        )
+    print(
+        f"[+] {port:<8}"
+        f"OPEN     "
+        f"{service:<15}"
+        f"{banner[:35]}"
+    )
 
     if args.output:
         save_scan_report(
