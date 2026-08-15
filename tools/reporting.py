@@ -8,7 +8,11 @@ def save_scan_report(
     end_port,
     open_ports,
     scan_time,
+    findings=None,
 ):
+    if findings is None:
+        findings = []
+
     report = {
         "target": target,
         "ports": {
@@ -16,6 +20,7 @@ def save_scan_report(
             "end": end_port,
         },
         "open_ports": open_ports,
+        "security_findings": findings,
         "summary": {
             "open": len(open_ports),
             "closed": (
@@ -24,6 +29,7 @@ def save_scan_report(
                 + 1
                 - len(open_ports)
             ),
+            "findings": len(findings),
         },
         "scan_time": round(scan_time, 2),
     }
@@ -37,4 +43,4 @@ def save_scan_report(
             report,
             file,
             indent=4,
-        )
+    )

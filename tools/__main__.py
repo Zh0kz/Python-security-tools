@@ -4,6 +4,8 @@ from tools.hash_checker import calculate_hash
 
 from tools.service_detection import detect_service
 
+from tools.vulnerability_checks import check_services
+
 from tools.file_integrity_monitor import (
     create_baseline,
     save_baseline,
@@ -106,6 +108,20 @@ def scan_command(args):
         f"{banner[:35]}"
     )
 
+    findings = check_services(report_ports)
+
+    if findings:
+        print("\nSecurity Assessment")
+        print("=" * 70)
+
+        for finding in findings:
+            print(
+                f"[{finding['risk']}] "
+                f"{finding['service']} "
+                f"on port {finding['port']}"
+            )
+            print(f"    {finding['message']}")
+
     if args.output:
         save_scan_report(
             args.output,
@@ -114,6 +130,7 @@ def scan_command(args):
             args.end_port,
             report_ports,
             scan_time,
+            findings,
         )
 
         print(
