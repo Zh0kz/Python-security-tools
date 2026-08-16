@@ -4,3 +4,4 @@ __pycache__/
 baseline.json
 fim_test/
 scan.json
+logs/
