@@ -1,0 +1,8 @@
+{
+    "scan": {
+        "start_port": 1,
+        "end_port": 1024,
+        "timeout": 0.5,
+        "workers": 100
+    }
+}

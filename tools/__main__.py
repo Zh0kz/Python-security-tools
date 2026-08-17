@@ -6,6 +6,13 @@ from tools.service_detection import detect_service
 
 from tools.vulnerability_checks import check_services
 
+import json
+
+from tools.config import (
+    load_config,
+    get_scan_config,
+)
+
 from tools.file_integrity_monitor import (
     create_baseline,
     save_baseline,
@@ -26,6 +33,23 @@ from tools.subnet_scanner import scan_subnet
 def scan_command(args):
     import socket
     import time
+
+    if args.config:
+        try:
+            config = load_config(args.config)
+            scan_config = get_scan_config(config)
+
+        except (
+            FileNotFoundError,
+            json.JSONDecodeError,
+        ) as error:
+            print(f"[!] Configuration error: {error}")
+            return 1
+
+        args.start_port = scan_config["start_port"]
+        args.end_port = scan_config["end_port"]
+        args.timeout = scan_config["timeout"]
+        args.workers = scan_config["workers"]
 
     try:
         target_ip = socket.gethostbyname(args.target)
@@ -343,6 +367,10 @@ def build_parser():
     scan_parser.add_argument(
     "--output",
     help="Save scan report to JSON file"
+    )
+    scan_parser.add_argument(
+        "--config",
+        help="Path to JSON configuration file"
     )
 
     scan_parser.set_defaults(
