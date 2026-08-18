@@ -2,6 +2,7 @@ import pytest
 
 from tools.subnet_scanner import scan_subnet
 
+
 def test_scan_subnet_too_large():
     with pytest.raises(ValueError, match="too large"):
         scan_subnet(
