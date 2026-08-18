@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-
 DEFAULT_CONFIG = {
     "scan": {
         "start_port": 1,

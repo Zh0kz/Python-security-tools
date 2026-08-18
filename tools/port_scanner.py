@@ -3,7 +3,6 @@ import socket
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
 COMMON_SERVICES = {
     21: "FTP",
     22: "SSH",
@@ -39,7 +38,7 @@ def scan_port(target, port, timeout):
 
         return port, False
 
-    except socket.error:
+    except OSError:
         return port, False
 
     finally:
@@ -59,7 +58,7 @@ def get_banner(target, port, timeout):
 
         return banner
 
-    except (socket.timeout, socket.error):
+    except (TimeoutError, OSError):
         return ""
 
     finally:
@@ -215,14 +214,8 @@ def main():
             for port in ports
         ]
 
-        completed = 0
-
-        for future in as_completed(futures):
-
+        for completed, future in enumerate(as_completed(futures), start=1):
             port, is_open = future.result()
-
-            completed += 1
-
             if is_open:
                 open_ports.append(port)
 

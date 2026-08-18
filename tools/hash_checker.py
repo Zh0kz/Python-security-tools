@@ -2,7 +2,6 @@ import argparse
 import hashlib
 from pathlib import Path
 
-
 SUPPORTED_ALGORITHMS = {
     "md5": hashlib.md5,
     "sha256": hashlib.sha256,

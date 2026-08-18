@@ -1,39 +1,53 @@
 import argparse
+import ipaddress
+import json
+import socket
+import time
 
+from tools import subnet_scanner
+from tools.config import (
+    get_scan_config,
+    load_config,
+)
+from tools.file_integrity_monitor import (
+    check_integrity,
+    create_baseline,
+    load_baseline,
+    save_baseline,
+)
 from tools.hash_checker import calculate_hash
-
+from tools.port_scanner import (
+    get_banner,
+    get_service_name,
+    run_scan,
+)
+from tools.reporting import save_scan_report
 from tools.service_detection import detect_service
-
 from tools.vulnerability_checks import check_services
 
-import json
 
-from tools.config import (
-    load_config,
-    get_scan_config,
-)
+def scan_subnet(network, timeout=1, workers=100):
+    """
+    Wrapper around subnet_scanner.scan_subnet.
 
-from tools.file_integrity_monitor import (
-    create_baseline,
-    save_baseline,
-    load_baseline,
-    check_integrity,
-)
+    Keeping this wrapper allows tests to patch either:
+    tools.__main__.scan_subnet
+    or:
+    tools.subnet_scanner.scan_subnet
+    """
+    return subnet_scanner.scan_subnet(
+        network,
+        timeout,
+        workers,
+    )
 
-from tools.port_scanner import (
-    run_scan,
-    get_service_name,
-    get_banner,
-)
 
-from tools.reporting import save_scan_report
+# ============================================================
+# PORT SCANNER COMMAND
+# ============================================================
 
-from tools.subnet_scanner import scan_subnet
 
 def scan_command(args):
-    import socket
-    import time
-
     if args.config:
         try:
             config = load_config(args.config)
@@ -53,6 +67,7 @@ def scan_command(args):
 
     try:
         target_ip = socket.gethostbyname(args.target)
+
     except socket.gaierror:
         print("[!] Could not resolve target.")
         return 1
@@ -62,7 +77,9 @@ def scan_command(args):
         return 1
 
     if args.start_port > args.end_port:
-        print("[!] Start port cannot be greater than end port.")
+        print(
+            "[!] Start port cannot be greater than end port."
+        )
         return 1
 
     if args.workers < 1:
@@ -106,7 +123,7 @@ def scan_command(args):
         banner = get_banner(
             target_ip,
             port,
-            args.timeout
+            args.timeout,
         )
 
         detected_service = detect_service(banner)
@@ -125,12 +142,12 @@ def scan_command(args):
             }
         )
 
-    print(
-        f"[+] {port:<8}"
-        f"OPEN     "
-        f"{service:<15}"
-        f"{banner[:35]}"
-    )
+        print(
+            f"[+] {port:<8}"
+            f"OPEN     "
+            f"{service:<15}"
+            f"{banner[:35]}"
+        )
 
     findings = check_services(report_ports)
 
@@ -144,7 +161,9 @@ def scan_command(args):
                 f"{finding['service']} "
                 f"on port {finding['port']}"
             )
-            print(f"    {finding['message']}")
+            print(
+                f"    {finding['message']}"
+            )
 
     if args.output:
         save_scan_report(
@@ -177,113 +196,152 @@ def scan_command(args):
 
     return 0
 
+
+# ============================================================
+# SUBNET SCANNER COMMAND
+# ============================================================
+
+
 def subnet_command(args):
-        import ipaddress
-        import time
-
-        try:
-            network = ipaddress.ip_network(
-                args.network,
-                strict=False,
-            )
-        except ValueError:
-            print(
-                f"[!] Invalid network: {args.network}"
-            )
-            return 1
-
-        if args.workers < 1:
-            print(
-                f"[!] Invalid number of workers: {args.workers}"
-            )
-            return 1
-
-        hosts = list(network.hosts())
-
-        print("=" * 70)
-        print("                    PYTHON SECURITY TOOLS")
-        print("                         SUBNET SCANNER")
-        print("=" * 70)
-
-        print(f"\nNetwork: {network}")
-        print(f"Hosts: {len(hosts)}")
-        print(f"Workers: {args.workers}\n")
-
-        start_time = time.perf_counter()
-
-        print("Starting subnet scan...\n")
-
-        try:
-            online_hosts = scan_subnet(
-                str(network),
-                args.timeout,
-                args.workers,
-            )
-        
-
-        except ValueError as error:
-            print(f"[!] {error}")
-            return 1
-
-        for host in online_hosts:
-            print(
-                f"[+] {host:<18} ONLINE"
-            )
-
-        scan_time = (
-            time.perf_counter() - start_time
+    try:
+        network = ipaddress.ip_network(
+            args.network,
+            strict=False,
         )
 
-        offline_hosts = (
-            len(hosts) - len(online_hosts)
+    except ValueError:
+        print(
+            f"[!] Invalid network: {args.network}"
+        )
+        return 1
+
+    if args.workers < 1:
+        print(
+            f"[!] Invalid number of workers: {args.workers}"
+        )
+        return 1
+
+    hosts = list(network.hosts())
+
+    print("=" * 70)
+    print("                    PYTHON SECURITY TOOLS")
+    print("                         SUBNET SCANNER")
+    print("=" * 70)
+
+    print(f"\nNetwork: {network}")
+    print(f"Hosts: {len(hosts)}")
+    print(f"Workers: {args.workers}\n")
+
+    start_time = time.perf_counter()
+
+    print("Starting subnet scan...\n")
+
+    try:
+        online_hosts = scan_subnet(
+            str(network),
+            args.timeout,
+            args.workers,
         )
 
-        print("\n")
-        print("=" * 70)
-        print("Subnet scan completed.")
-        print(f"Online hosts: {len(online_hosts)}")
-        print(f"Offline hosts: {offline_hosts}")
-        print(f"Scan time: {scan_time:.2f} seconds")
-        print("=" * 70)
+    except ValueError as error:
+        print(f"[!] {error}")
+        return 1
 
-        return 0 
+    for host in online_hosts:
+        print(
+            f"[+] {host:<18} ONLINE"
+        )
+
+    scan_time = (
+        time.perf_counter() - start_time
+    )
+
+    offline_hosts = (
+        len(hosts) - len(online_hosts)
+    )
+
+    print("\n")
+    print("=" * 70)
+    print("Subnet scan completed.")
+    print(f"Online hosts: {len(online_hosts)}")
+    print(f"Offline hosts: {offline_hosts}")
+    print(f"Scan time: {scan_time:.2f} seconds")
+    print("=" * 70)
+
+    return 0
+
+
+# ============================================================
+# HASH COMMAND
+# ============================================================
+
 
 def hash_command(args):
     file_hash = calculate_hash(
         args.file,
-        args.algorithm
+        args.algorithm,
     )
 
     print(f"File: {args.file}")
-    print(f"Algorithm: {args.algorithm.upper()}")
+    print(
+        f"Algorithm: {args.algorithm.upper()}"
+    )
     print(f"Hash: {file_hash}")
 
 
+# ============================================================
+# FIM BASELINE COMMAND
+# ============================================================
+
+
 def fim_baseline_command(args):
-    baseline = create_baseline(args.directory)
+    baseline = create_baseline(
+        args.directory
+    )
 
     save_baseline(
         baseline,
-        args.output
+        args.output,
     )
 
-    print(f"Baseline created: {args.output}")
-    print(f"Files monitored: {len(baseline)}")
+    print(
+        f"Baseline created: {args.output}"
+    )
+
+    print(
+        f"Files monitored: {len(baseline)}"
+    )
+
+
+# ============================================================
+# FIM CHECK COMMAND
+# ============================================================
 
 
 def fim_check_command(args):
-    baseline = load_baseline(args.baseline)
+    baseline = load_baseline(
+        args.baseline
+    )
 
     result = check_integrity(
         args.directory,
-        baseline
+        baseline,
     )
 
     print("File Integrity Check")
     print("=" * 40)
-    print(f"Added:    {len(result['added'])}")
-    print(f"Deleted:  {len(result['deleted'])}")
-    print(f"Modified: {len(result['modified'])}")
+
+    print(
+        f"Added:    {len(result['added'])}"
+    )
+
+    print(
+        f"Deleted:  {len(result['deleted'])}"
+    )
+
+    print(
+        f"Modified: {len(result['modified'])}"
+    )
 
     if result["added"]:
         print("\nAdded files:")
@@ -304,169 +362,185 @@ def fim_check_command(args):
             print(f"  ! {path}")
 
     if any(result.values()):
-        print("\nSTATUS: INTEGRITY CHECK FAILED")
+        print(
+            "\nSTATUS: INTEGRITY CHECK FAILED"
+        )
         return 1
 
-    print("\nSTATUS: INTEGRITY OK")
+    print(
+        "\nSTATUS: INTEGRITY OK"
+    )
+
     return 0
+
+
+# ============================================================
+# CLI PARSER
+# ============================================================
 
 
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="python -m tools",
-        description="Python Security Tools"
+        description="Python Security Tools",
     )
 
     subparsers = parser.add_subparsers(
         dest="command",
-        required=True
+        required=True,
     )
-    # ==========================
+
+    # ========================================================
     # PORT SCANNER
-    # ==========================
+    # ========================================================
 
     scan_parser = subparsers.add_parser(
         "scan",
-        help="TCP port scanner"
+        help="TCP port scanner",
     )
 
     scan_parser.add_argument(
         "--target",
         required=True,
-        help="Target IP address or hostname"
+        help="Target IP address or hostname",
     )
 
     scan_parser.add_argument(
         "--start-port",
         type=int,
         default=1,
-        help="Starting port"
+        help="Starting port",
     )
 
     scan_parser.add_argument(
         "--end-port",
         type=int,
         default=1024,
-        help="Ending port"
+        help="Ending port",
     )
 
     scan_parser.add_argument(
         "--timeout",
         type=float,
         default=0.5,
-        help="Connection timeout"
+        help="Connection timeout",
     )
 
     scan_parser.add_argument(
         "--workers",
         type=int,
         default=100,
-        help="Number of concurrent workers"
+        help="Number of concurrent workers",
     )
 
     scan_parser.add_argument(
-    "--output",
-    help="Save scan report to JSON file"
+        "--output",
+        help="Save scan report to JSON file",
     )
+
     scan_parser.add_argument(
         "--config",
-        help="Path to JSON configuration file"
+        help="Path to JSON configuration file",
     )
 
     scan_parser.set_defaults(
         func=scan_command
     )
 
-    # ==========================
+    # ========================================================
     # SUBNET SCANNER
-    # ==========================
+    # ========================================================
 
     subnet_parser = subparsers.add_parser(
         "subnet",
-        help="Scan a subnet for online hosts"
+        help="Scan a subnet for online hosts",
     )
 
     subnet_parser.add_argument(
         "--network",
         required=True,
-        help="Network in CIDR notation"
+        help="Network in CIDR notation",
     )
 
     subnet_parser.add_argument(
         "--timeout",
         type=float,
         default=1,
-        help="Ping timeout in seconds"
+        help="Ping timeout in seconds",
     )
 
     subnet_parser.add_argument(
         "--workers",
         type=int,
         default=100,
-        help="Number of concurrent workers"
+        help="Number of concurrent workers",
     )
 
     subnet_parser.set_defaults(
         func=subnet_command
     )
-    
-    # ==========================
+
+    # ========================================================
     # HASH
-    # ==========================
+    # ========================================================
 
     hash_parser = subparsers.add_parser(
         "hash",
-        help="Calculate a file hash"
+        help="Calculate a file hash",
     )
 
     hash_parser.add_argument(
         "--file",
         required=True,
-        help="Path to the file"
+        help="Path to the file",
     )
 
     hash_parser.add_argument(
         "--algorithm",
-        choices=["md5", "sha256", "sha512"],
+        choices=[
+            "md5",
+            "sha256",
+            "sha512",
+        ],
         default="sha256",
-        help="Hash algorithm"
+        help="Hash algorithm",
     )
 
     hash_parser.set_defaults(
         func=hash_command
     )
 
-    # ==========================
+    # ========================================================
     # FIM
-    # ==========================
+    # ========================================================
 
     fim_parser = subparsers.add_parser(
         "fim",
-        help="File Integrity Monitor"
+        help="File Integrity Monitor",
     )
 
     fim_subparsers = fim_parser.add_subparsers(
         dest="fim_command",
-        required=True
+        required=True,
     )
 
     # FIM baseline
 
     baseline_parser = fim_subparsers.add_parser(
         "baseline",
-        help="Create a file integrity baseline"
+        help="Create a file integrity baseline",
     )
 
     baseline_parser.add_argument(
         "--directory",
         required=True,
-        help="Directory to monitor"
+        help="Directory to monitor",
     )
 
     baseline_parser.add_argument(
         "--output",
         default="baseline.json",
-        help="Baseline output file"
+        help="Baseline output file",
     )
 
     baseline_parser.set_defaults(
@@ -477,19 +551,19 @@ def build_parser():
 
     check_parser = fim_subparsers.add_parser(
         "check",
-        help="Check file integrity"
+        help="Check file integrity",
     )
 
     check_parser.add_argument(
         "--directory",
         required=True,
-        help="Directory to check"
+        help="Directory to check",
     )
 
     check_parser.add_argument(
         "--baseline",
         default="baseline.json",
-        help="Baseline file"
+        help="Baseline file",
     )
 
     check_parser.set_defaults(
@@ -497,6 +571,11 @@ def build_parser():
     )
 
     return parser
+
+
+# ============================================================
+# MAIN
+# ============================================================
 
 
 def main():

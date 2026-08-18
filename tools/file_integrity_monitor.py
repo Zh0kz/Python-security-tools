@@ -4,7 +4,6 @@ from pathlib import Path
 
 from tools.hash_checker import calculate_hash
 
-
 DEFAULT_ALGORITHM = "sha256"
 
 
