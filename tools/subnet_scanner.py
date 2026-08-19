@@ -1,6 +1,6 @@
 import ipaddress
 import platform
-import subprocess
+import subprocess  # nosec B404
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MAX_HOSTS = 4096
