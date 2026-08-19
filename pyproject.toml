@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "python-security-tools"
+version = "2.9.0"
+description = "A Python-based security toolkit with port scanning, subnet scanning, hashing, file integrity monitoring, and security checks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+authors = [
+    {name = "Zh0kz"}
+]
+
+keywords = [
+    "cybersecurity",
+    "security",
+    "network-scanner",
+    "port-scanner",
+    "subnet-scanner",
+    "file-integrity",
+    "security-tools"
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Networking"
+]
+
+dependencies = []
+
+
+[project.scripts]
+security-tools = "tools.__main__:main"
+
+
+[tool.setuptools]
+packages = ["tools"]
+
+
+[tool.ruff]
+line-length = 79
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
