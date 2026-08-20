@@ -5,6 +5,7 @@ import socket
 import time
 
 from tools import subnet_scanner
+from tools.audit import run_audit
 from tools.config import (
     get_scan_config,
     load_config,
@@ -374,6 +375,116 @@ def fim_check_command(args):
     return 0
 
 
+
+# ============================================================
+# AUDIT COMMAND
+# ============================================================
+
+
+
+
+def audit_command(args):
+    print("=" * 70)
+    print("                    PYTHON SECURITY TOOLS")
+    print("                       SECURITY AUDIT")
+    print("=" * 70)
+
+    print(f"\nTarget: {args.target}")
+    print(f"Ports: {args.start_port}-{args.end_port}")
+    print(f"Workers: {args.workers}")
+    print("\nStarting security audit...\n")
+
+    try:
+        result = run_audit(
+            args.target,
+            args.start_port,
+            args.end_port,
+            args.timeout,
+            args.workers,
+        )
+
+    except ValueError as error:
+        print(f"[!] {error}")
+        return 1
+
+    print(f"Resolved IP: {result['resolved_ip']}\n")
+
+    print("Discovered Services")
+    print("=" * 70)
+
+    if not result["services"]:
+        print("No open ports detected.")
+
+    for service in result["services"]:
+        banner = service["banner"] or "-"
+
+        print(
+            f"[+] {service['port']:<8}"
+            f"OPEN     "
+            f"{service['service']:<15}"
+            f"{banner[:35]}"
+        )
+
+    print("\nSecurity Assessment")
+    print("=" * 70)
+
+    if not result["findings"]:
+        print("No security findings.")
+
+    for finding in result["findings"]:
+        print(
+            f"[{finding['risk']}] "
+            f"{finding['service']} "
+            f"on port {finding['port']}"
+        )
+
+        print(
+            f"    {finding['message']}"
+        )
+
+    risk = result["risk"]
+
+    print("\nRisk Assessment")
+    print("=" * 70)
+
+    print(
+        f"Risk Score: {risk['score']}/100"
+    )
+
+    print(
+        f"Risk Level: {risk['level']}"
+    )
+
+    print("\nSeverity Breakdown:")
+
+    for severity, count in risk["breakdown"].items():
+        print(
+            f"  {severity:<9} {count}"
+        )
+
+    print("\nAudit Summary")
+    print("=" * 70)
+
+    print(
+        f"Open ports:   {result['ports']['open']}"
+    )
+
+    print(
+        f"Closed ports: {result['ports']['closed']}"
+    )
+
+    print(
+        f"Findings:     {len(result['findings'])}"
+    )
+
+    print(
+        f"Audit time:   {result['scan_time']:.2f} seconds"
+    )
+
+    print("=" * 70)
+
+    return 0
+
 # ============================================================
 # CLI PARSER
 # ============================================================
@@ -510,6 +621,9 @@ def build_parser():
         func=hash_command
     )
 
+
+
+
     # ========================================================
     # FIM
     # ========================================================
@@ -570,9 +684,54 @@ def build_parser():
         func=fim_check_command
     )
 
+    # ========================================================
+    # SECURITY AUDIT
+    # ========================================================
+
+    audit_parser = subparsers.add_parser(
+        "audit",
+        help="Run security audit",
+    )
+
+    audit_parser.add_argument(
+        "--target",
+        required=True,
+        help="Target IP address or hostname",
+    )
+
+    audit_parser.add_argument(
+        "--start-port",
+        type=int,
+        default=1,
+        help="Starting port",
+    )
+
+    audit_parser.add_argument(
+        "--end-port",
+        type=int,
+        default=1024,
+        help="Ending port",
+    )
+
+    audit_parser.add_argument(
+        "--timeout",
+        type=float,
+        default=0.5,
+        help="Connection timeout",
+    )
+
+    audit_parser.add_argument(
+        "--workers",
+        type=int,
+        default=100,
+        help="Number of concurrent workers",
+    )
+
+    audit_parser.set_defaults(
+        func=audit_command
+    )
+
     return parser
-
-
 # ============================================================
 # MAIN
 # ============================================================
