@@ -1,6 +1,19 @@
 import json
 
 
+def save_audit_report(path, result):
+    with open(
+        path,
+        "w",
+        encoding="utf-8",
+    ) as report_file:
+        json.dump(
+            result,
+            report_file,
+            indent=2,
+            ensure_ascii=False,
+        )
+
 def save_scan_report(
     output_file,
     target,

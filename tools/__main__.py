@@ -22,7 +22,10 @@ from tools.port_scanner import (
     get_service_name,
     run_scan,
 )
-from tools.reporting import save_scan_report
+from tools.reporting import (
+    save_audit_report,
+    save_scan_report,
+)
 from tools.service_detection import detect_service
 from tools.vulnerability_checks import check_services
 
@@ -384,6 +387,7 @@ def fim_check_command(args):
 
 
 def audit_command(args):
+
     print("=" * 70)
     print("                    PYTHON SECURITY TOOLS")
     print("                       SECURITY AUDIT")
@@ -393,7 +397,6 @@ def audit_command(args):
     print(f"Ports: {args.start_port}-{args.end_port}")
     print(f"Workers: {args.workers}")
     print("\nStarting security audit...\n")
-
     try:
         result = run_audit(
             args.target,
@@ -444,6 +447,28 @@ def audit_command(args):
 
     risk = result["risk"]
 
+
+
+    print("\nAudit Summary")
+    print("=" * 70)
+
+    if args.output:
+        with open(
+            args.output,
+            "w",
+            encoding="utf-8",
+        ) as report_file:
+            json.dump(
+                result,
+                report_file,
+                indent=2,
+                ensure_ascii=False,
+            )
+
+        print(
+            f"\nReport saved: {args.output}"
+        )
+
     print("\nRisk Assessment")
     print("=" * 70)
 
@@ -482,7 +507,19 @@ def audit_command(args):
     )
 
     print("=" * 70)
+    # ==========================================
+    # SAVE AUDIT REPORT
+    # ==========================================
 
+    if args.output:
+        save_audit_report(
+            args.output,
+            result,
+        )
+
+        print(
+            f"\nReport saved: {args.output}"
+        )
     return 0
 
 # ============================================================
@@ -727,6 +764,10 @@ def build_parser():
         help="Number of concurrent workers",
     )
 
+    audit_parser.add_argument(
+        "--output",
+        help="Save audit report to JSON file",
+    )
     audit_parser.set_defaults(
         func=audit_command
     )
